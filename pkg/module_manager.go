@@ -7,16 +7,9 @@ import (
 	bpf "github.com/aquasecurity/libbpfgo"
 )
 
-//go:embed bpf/unlinkat.bpf.o
-var unlinkatBpf []byte
-
-const btf = "should not be used" // canary to detect we got relocations
-
 func LoadUnlinkatModule() (*model.BpfModule, error) {
-	//args := bpf.NewModuleArgs{BPFObjBuff: unlinkatBpf, BPFObjName: "unlinkat", BTFObjPath: btf}
-	//module, err := bpf.NewModuleFromBufferArgs(args)
-
-	module, err := bpf.NewModuleFromFile("unlinkat.bpf.o")
+	args := bpf.NewModuleArgs{BPFObjBuff: unlinkatBpf, BPFObjName: "unlinkat"}
+	module, err := bpf.NewModuleFromBufferArgs(args)
 
 	if err != nil {
 		return nil, err
@@ -66,3 +59,6 @@ func resizeMap(module *bpf.Module, name string, size uint32) error {
 	}
 	return nil
 }
+
+//go:embed bpf/unlinkat.bpf.o
+var unlinkatBpf []byte
