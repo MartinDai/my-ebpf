@@ -4,7 +4,6 @@
 
 struct event {
     u32 pid;
-    u64 timestamp;
     char filename[256];
 };
 
@@ -19,8 +18,6 @@ int kprobe__do_unlinkat(struct pt_regs *ctx) {
     struct event e = {};
 
     e.pid = bpf_get_current_pid_tgid() >> 32;
-    u64 timestamp = bpf_ktime_get_ns();
-    e.timestamp = timestamp / 1000000;
     bpf_probe_read(&e.filename, sizeof(e.filename), PT_REGS_PARM2(ctx));
 
     bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &e, sizeof(e));
