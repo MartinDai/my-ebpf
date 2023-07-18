@@ -1,43 +1,26 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"github.com/MartinDai/my-ebpf/pkg"
 	"log"
+	"os"
+	"os/signal"
 )
 
-type event struct {
-	Pid      uint32
-	Filename [256]byte
-}
-
 func main() {
-	bpfModule, err := pkg.LoadUnlinkatModule()
+	unlinkatModule := pkg.NewUnlinkatModule()
+	err := unlinkatModule.Start()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Start unlinkat module error, Cause:%v", err)
 	}
-	defer bpfModule.Module.Close()
 
-	bpfModule.Pb.Start()
-	defer func() {
-		bpfModule.Pb.Stop()
-		bpfModule.Pb.Close()
-	}()
+	log.Println("Start unlinkat module successful")
 
-	for {
-		select {
-		case data := <-bpfModule.EventsChannel:
-			var e event
-			dataBuffer := bytes.NewBuffer(data)
-			err = binary.Read(dataBuffer, binary.LittleEndian, &e)
-			log.Printf("pid %d unlinkat %v", e.Pid, e.filename())
-		case e := <-bpfModule.LostChannel:
-			log.Printf("lost %d events", e)
-		}
-	}
-}
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
 
-func (c event) filename() string {
-	return string(bytes.TrimRight(c.Filename[:], "\x00"))
+	unlinkatModule.Stop()
+
+	log.Println("Stop unlinkat module successful")
 }
