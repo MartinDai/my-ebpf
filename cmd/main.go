@@ -4,15 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/MartinDai/my-ebpf/pkg"
 	"log"
 
 	bpf "github.com/aquasecurity/libbpfgo"
 )
-
-type gdata struct {
-	Pid      uint32
-	FileName string
-}
 
 func resizeMap(module *bpf.Module, name string, size uint32) error {
 	m, err := module.GetMap(name)
@@ -29,7 +25,7 @@ func resizeMap(module *bpf.Module, name string, size uint32) error {
 }
 
 func main() {
-	bpfModule, err := bpf.NewModuleFromFile("unlinkat.bpf.o")
+	bpfModule, err := pkg.LoadUnlinkatModule()
 	if err != nil {
 		panic(err)
 	}
@@ -67,11 +63,7 @@ func main() {
 		case e := <-eventsChannel:
 			pid := binary.LittleEndian.Uint32(e[0:4])
 			fileName := string(bytes.TrimRight(e[4:], "\x00"))
-			gd := gdata{
-				Pid:      pid,
-				FileName: fileName,
-			}
-			log.Printf("pid %d unlinkat %q", gd.Pid, gd.FileName)
+			log.Printf("pid %d unlinkat %q", pid, fileName)
 		case e := <-lostChannel:
 			log.Printf("lost %d events", e)
 		}

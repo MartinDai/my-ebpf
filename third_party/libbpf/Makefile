@@ -1,4 +1,4 @@
-LIBBPF_VERSION ?= v0.8.1
+LIBBPF_VERSION ?= v1.1.0
 
 .PHONY: build-libbpf
 build-libbpf:
