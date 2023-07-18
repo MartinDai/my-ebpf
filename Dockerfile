@@ -13,8 +13,8 @@ ADD third_party/libbpf/Makefile /build/libbpf/
 RUN make -C /build/libbpf/
 ADD third_party/bcc/Makefile /build/bcc/
 RUN make -C /build/bcc/
-ADD pkg/bpf/Makefile pkg/bpf/monitor.bpf.c /build/monitor.bpf/
-RUN CFLAGS=-I/build/libbpf/lib/include make -C /build/monitor.bpf
+ADD pkg/bpf /build/bpf/
+RUN CFLAGS=-I/build/libbpf/lib/include make -C /build/bpf/
 
 #              _
 #             | |
@@ -35,7 +35,7 @@ WORKDIR /opt/my-ebpf
 
 COPY --from=ebpf-builder /build/bcc/lib third_party/bcc/lib
 COPY --from=ebpf-builder /build/libbpf/lib third_party/libbpf/lib
-COPY --from=ebpf-builder /build/monitor.bpf/monitor.bpf.o pkg/bpf/monitor.bpf.o
+COPY --from=ebpf-builder /build/bpf pkg/bpf
 COPY Makefile ./
 COPY go.mod go.sum ./
 RUN make install-go-dependencies
@@ -56,13 +56,13 @@ RUN make build
 
 FROM alpine:3.16
 
-WORKDIR /var/lib/my-ebpf
+WORKDIR /opt/my-ebpf
 
 RUN apk update && apk upgrade && \
     apk add --no-cache ca-certificates bash tzdata openssl musl-utils bash-completion
 
 COPY --from=go-builder --chmod=0777 /opt/my-ebpf/bin/my-ebpf /usr/bin/my-ebpf
-COPY --from=go-builder /opt/my-ebpf/pkg/bpf/monitor.bpf.o /usr/bin/monitor.bpf.o
+COPY --from=go-builder /opt/my-ebpf/pkg/bpf ./pkg/bpf
 
 USER root
 ENTRYPOINT [ "/usr/bin/my-ebpf" ]

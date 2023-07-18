@@ -29,7 +29,7 @@ func resizeMap(module *bpf.Module, name string, size uint32) error {
 }
 
 func main() {
-	bpfModule, err := bpf.NewModuleFromFile("monitor.bpf.o")
+	bpfModule, err := bpf.NewModuleFromFile("unlinkat.bpf.o")
 	if err != nil {
 		panic(err)
 	}
