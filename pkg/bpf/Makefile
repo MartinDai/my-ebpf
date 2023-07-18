@@ -2,7 +2,7 @@ CLANG ?= clang
 
 CFLAGS := $(CFLAGS) -ggdb -gdwarf -O2 -Wall -fpie -Wno-unused-variable -Wno-unused-function
 
-monitor.bpf.o: monitor.bpf.c monitor.bpf.h vmlinux.h
+monitor.bpf.o: monitor.bpf.c vmlinux.h
 	$(CLANG) $(CFLAGS) -target bpf -D__TARGET_ARCH_x86 -I. -c monitor.bpf.c -o $@
 
 vmlinux.h:

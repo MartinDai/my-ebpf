@@ -41,11 +41,11 @@ func main() {
 	if err := bpfModule.BPFLoadObject(); err != nil {
 		panic(err)
 	}
-	prog, err := bpfModule.GetProgram("kprobe__vfs_read")
+	prog, err := bpfModule.GetProgram("kprobe__do_unlinkat")
 	if err != nil {
 		panic(err)
 	}
-	if _, err := prog.AttachKprobe("vfs_read"); err != nil {
+	if _, err := prog.AttachKprobe("do_unlinkat"); err != nil {
 		panic(err)
 	}
 
@@ -71,7 +71,7 @@ func main() {
 				Pid:      pid,
 				FileName: fileName,
 			}
-			log.Printf("pid %d opened %q", gd.Pid, gd.FileName)
+			log.Printf("pid %d unlinkat %q", gd.Pid, gd.FileName)
 		case e := <-lostChannel:
 			log.Printf("lost %d events", e)
 		}

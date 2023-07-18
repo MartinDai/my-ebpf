@@ -13,7 +13,7 @@ ADD third_party/libbpf/Makefile /build/libbpf/
 RUN make -C /build/libbpf/
 ADD third_party/bcc/Makefile /build/bcc/
 RUN make -C /build/bcc/
-ADD pkg/bpf/Makefile pkg/bpf/monitor.bpf.c pkg/bpf/monitor.bpf.h /build/monitor.bpf/
+ADD pkg/bpf/Makefile pkg/bpf/monitor.bpf.c /build/monitor.bpf/
 RUN CFLAGS=-I/build/libbpf/lib/include make -C /build/monitor.bpf
 
 #              _
@@ -26,11 +26,10 @@ RUN CFLAGS=-I/build/libbpf/lib/include make -C /build/monitor.bpf
 #  |___/                     |___/
 
 
-FROM golang:1.19-alpine3.16 AS go-builder
+FROM golang:1.20-alpine3.16 AS go-builder
 
 RUN apk update && apk upgrade && \
-    apk add --no-cache make git zstd gcc g++ libc-dev musl-dev bash zlib-dev elfutils-dev libelf-static zlib-static \
-    linux-headers
+    apk add --no-cache make zstd gcc g++ libc-dev musl-dev bash zlib-dev elfutils-dev libelf-static zlib-static linux-headers
 
 WORKDIR /opt/my-ebpf
 

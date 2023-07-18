@@ -1,7 +1,11 @@
 #include "vmlinux.h"
-#include "monitor.bpf.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+
+struct event {
+    u32 pid;
+    char filename[256];
+};
 
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -9,8 +13,8 @@ struct {
     __uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
-SEC("kprobe/vfs_read")
-int kprobe__vfs_read(struct pt_regs *ctx) {
+SEC("kprobe/do_unlinkat")
+int kprobe__do_unlinkat(struct pt_regs *ctx) {
     struct event e = {};
 
     e.pid = bpf_get_current_pid_tgid() >> 32;
