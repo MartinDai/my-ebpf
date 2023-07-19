@@ -1,8 +1,8 @@
 # my-ebpf
 
-ebpf开发demo
+ebpf开发demo，只支持amd64架构
 
 ## 编译
 ```shell
-docker buildx build -t my-ebpf:1.0 --platform=linux/amd64 -o type=docker .
+sh build.sh
 ```

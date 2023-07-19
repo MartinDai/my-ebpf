@@ -62,7 +62,6 @@ RUN apk update && apk upgrade && \
     apk add --no-cache ca-certificates bash tzdata openssl musl-utils bash-completion
 
 COPY --from=go-builder --chmod=0777 /opt/my-ebpf/bin/my-ebpf /usr/bin/my-ebpf
-COPY --from=go-builder /opt/my-ebpf/pkg/bpf ./pkg/bpf
 
 USER root
 ENTRYPOINT [ "/usr/bin/my-ebpf" ]
