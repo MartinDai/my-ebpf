@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/MartinDai/my-ebpf/pkg"
+	"github.com/MartinDai/my-ebpf/pkg/model"
 	"github.com/MartinDai/my-ebpf/pkg/util"
 	"log"
 	"os"
@@ -16,14 +17,14 @@ func main() {
 	flag.StringVar(&configFile, "config", "", "配置文件")
 	flag.Parse()
 
-	config, err := util.GetConfig(configFile)
-	if err != nil {
+	var err error
+	var config *model.Config
+	if config, err = util.GetConfig(configFile); err != nil {
 		log.Fatal(fmt.Errorf("[ERROR] Process config error\nCause: %w", err))
 	}
 
 	unlinkatModule := pkg.NewUnlinkatModule(config.Pid)
-	err = unlinkatModule.Start()
-	if err != nil {
+	if err = unlinkatModule.Start(); err != nil {
 		log.Fatalf("[INFO] Start unlinkat module error, Cause:%v", err)
 	}
 

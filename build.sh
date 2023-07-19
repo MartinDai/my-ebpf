@@ -12,8 +12,6 @@ IMAGE_NAME=${BUILD_NAME}:${VERSION}
 docker buildx build -t ${IMAGE_NAME} --platform=linux/amd64 -o type=docker .
 
 CID=$(docker create ${IMAGE_NAME})
-FILE_PATH=$2
-LOCAL_PATH=$3
 docker cp ${CID}:/usr/bin/my-ebpf ./bin/
 docker rm -v ${CID}
 

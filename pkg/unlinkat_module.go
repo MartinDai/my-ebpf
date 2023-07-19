@@ -24,6 +24,7 @@ type UnlinkatEvent struct {
 type UnlinkatModule struct {
 	pid           int
 	module        *bpf.Module
+	prog          *bpf.BPFProg
 	mapArgs       *bpf.BPFMap
 	eventPb       *bpf.PerfBuffer
 	eventsChannel chan []byte
@@ -43,9 +44,7 @@ func NewUnlinkatModule(pid int) *UnlinkatModule {
 func (um *UnlinkatModule) Start() error {
 	var err error
 	args := bpf.NewModuleArgs{BPFObjBuff: unlinkatBpf, BPFObjName: "unlinkat"}
-	um.module, err = bpf.NewModuleFromBufferArgs(args)
-
-	if err != nil {
+	if um.module, err = bpf.NewModuleFromBufferArgs(args); err != nil {
 		return err
 	}
 
@@ -56,8 +55,7 @@ func (um *UnlinkatModule) Start() error {
 	if err := um.module.BPFLoadObject(); err != nil {
 		return err
 	}
-	prog, err := um.module.GetProgram("kprobe__do_unlinkat")
-	if err != nil {
+	if um.prog, err = um.module.GetProgram("kprobe__do_unlinkat"); err != nil {
 		return err
 	}
 
@@ -69,7 +67,7 @@ func (um *UnlinkatModule) Start() error {
 		return err
 	}
 
-	if _, err := prog.AttachKprobe("do_unlinkat"); err != nil {
+	if _, err := um.prog.AttachKprobe("do_unlinkat"); err != nil {
 		return err
 	}
 
@@ -103,8 +101,7 @@ func (um *UnlinkatModule) initArgs() error {
 	args := C.struct_unlinkat_args{
 		tgid_filter: C.uint(tgidFilter),
 	}
-	err = um.mapArgs.UpdateValueFlags(unsafe.Pointer(&zero), unsafe.Pointer(&args), 0)
-	if err != nil {
+	if err = um.mapArgs.UpdateValueFlags(unsafe.Pointer(&zero), unsafe.Pointer(&args), 0); err != nil {
 		return err
 	}
 	return nil
@@ -116,8 +113,7 @@ func (um *UnlinkatModule) processEvents() {
 		case data := <-um.eventsChannel:
 			var e UnlinkatEvent
 			dataBuffer := bytes.NewBuffer(data)
-			err := binary.Read(dataBuffer, binary.LittleEndian, &e)
-			if err != nil {
+			if err := binary.Read(dataBuffer, binary.LittleEndian, &e); err != nil {
 				log.Printf("process event error, Cause%v\n", err)
 				continue
 			}
@@ -139,8 +135,9 @@ func (um *UnlinkatModule) Stop() {
 }
 
 func (um *UnlinkatModule) resizeMap(name string, size uint32) error {
-	m, err := um.module.GetMap(name)
-	if err != nil {
+	var m *bpf.BPFMap
+	var err error
+	if m, err = um.module.GetMap(name); err != nil {
 		return err
 	}
 	if err = m.Resize(size); err != nil {

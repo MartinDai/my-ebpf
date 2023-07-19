@@ -13,13 +13,12 @@ import (
 
 func GetConfig(configFile string) (*model.Config, error) {
 	var config model.Config
-	err := loadConfig(configFile, &config)
-	if err != nil {
+	var err error
+	if err = loadConfig(configFile, &config); err != nil {
 		return nil, err
 	}
 
-	err = checkConfig(&config)
-	if err != nil {
+	if err = checkConfig(&config); err != nil {
 		return nil, err
 	}
 
@@ -32,8 +31,7 @@ func checkConfig(config *model.Config) error {
 		return nil
 	}
 
-	err := validatePID(config.Pid)
-	if err != nil {
+	if err := validatePID(config.Pid); err != nil {
 		return fmt.Errorf("pid is not valid")
 	}
 
@@ -50,19 +48,18 @@ func loadConfig(configFile string, config interface{}) error {
 		return fmt.Errorf("config file only supports .yml or .yaml format")
 	}
 
-	absolutePath, err := filepath.Abs(configFile)
-	if err != nil {
+	var absolutePath string
+	var err error
+	if absolutePath, err = filepath.Abs(configFile); err != nil {
 		return err
 	}
 
 	k := koanf.New("::")
-	err = k.Load(file.Provider(absolutePath), yaml.Parser())
-	if err != nil {
+	if err = k.Load(file.Provider(absolutePath), yaml.Parser()); err != nil {
 		return err
 	}
 
-	err = k.Unmarshal("", config)
-	if err != nil {
+	if err = k.Unmarshal("", config); err != nil {
 		return err
 	}
 
@@ -70,8 +67,7 @@ func loadConfig(configFile string, config interface{}) error {
 }
 
 func validatePID(pid int) error {
-	err := syscall.Kill(pid, 0)
-	if err != nil {
+	if err := syscall.Kill(pid, 0); err != nil {
 		return err
 	}
 	return nil

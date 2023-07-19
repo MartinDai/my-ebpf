@@ -24,8 +24,6 @@ RUN CFLAGS=-I/build/libbpf/lib/include make -C /build/bpf/
 #  \__, |\___/|_|\__,_|_| |_|\__, |
 #   __/ |                     __/ |
 #  |___/                     |___/
-
-
 FROM golang:1.20-alpine3.16 AS go-builder
 
 RUN apk update && apk upgrade && \
@@ -42,7 +40,6 @@ RUN make install-go-dependencies
 
 COPY pkg ./pkg
 COPY cmd ./cmd
-
 RUN make build
 
 #   __ _             _   _
@@ -53,7 +50,6 @@ RUN make build
 # |_| |_|_| |_|\__,_|_| |_|_| |_| |_|\__,_|\__, |\___|
 #                                           __/ |
 #                                          |___/
-
 FROM alpine:3.16
 
 WORKDIR /opt/my-ebpf
