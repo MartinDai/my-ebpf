@@ -1,5 +1,6 @@
 package pkg
 
+import "C"
 import (
 	"bytes"
 	_ "embed"
@@ -7,7 +8,13 @@ import (
 	"fmt"
 	bpf "github.com/aquasecurity/libbpfgo"
 	"log"
+	"unsafe"
 )
+
+//#cgo CFLAGS: -I./bpf/
+//#include <linux/types.h>
+//#include "unlinkat.bpf.h"
+import "C"
 
 type UnlinkatEvent struct {
 	Pid      uint32
@@ -15,60 +22,98 @@ type UnlinkatEvent struct {
 }
 
 type UnlinkatModule struct {
+	pid           int
 	module        *bpf.Module
+	mapArgs       *bpf.BPFMap
+	eventPb       *bpf.PerfBuffer
 	eventsChannel chan []byte
 	lostChannel   chan uint64
 	stopCh        chan struct{}
 }
 
-func NewUnlinkatModule() *UnlinkatModule {
+func NewUnlinkatModule(pid int) *UnlinkatModule {
 	return &UnlinkatModule{
+		pid:           pid,
 		eventsChannel: make(chan []byte),
 		lostChannel:   make(chan uint64),
 		stopCh:        make(chan struct{}),
 	}
 }
 
-func (bm *UnlinkatModule) Start() error {
+func (um *UnlinkatModule) Start() error {
 	var err error
 	args := bpf.NewModuleArgs{BPFObjBuff: unlinkatBpf, BPFObjName: "unlinkat"}
-	bm.module, err = bpf.NewModuleFromBufferArgs(args)
+	um.module, err = bpf.NewModuleFromBufferArgs(args)
 
 	if err != nil {
 		return err
 	}
 
-	if err = bm.resizeMap("events", 8192); err != nil {
+	if err = um.resizeMap("events", 8192); err != nil {
 		return err
 	}
 
-	if err := bm.module.BPFLoadObject(); err != nil {
+	if err := um.module.BPFLoadObject(); err != nil {
 		return err
 	}
-	prog, err := bm.module.GetProgram("kprobe__do_unlinkat")
+	prog, err := um.module.GetProgram("kprobe__do_unlinkat")
 	if err != nil {
 		return err
 	}
+
+	if err = um.findMaps(); err != nil {
+		return err
+	}
+
+	if err = um.initArgs(); err != nil {
+		return err
+	}
+
 	if _, err := prog.AttachKprobe("do_unlinkat"); err != nil {
 		return err
 	}
 
-	pb, err := bm.module.InitPerfBuf("events", bm.eventsChannel, bm.lostChannel, 1)
-	if err != nil {
-		return err
-	}
+	um.eventPb.Start()
 
-	pb.Start()
-
-	go bm.processEvents()
+	go um.processEvents()
 
 	return nil
 }
 
-func (bm *UnlinkatModule) processEvents() {
+func (um *UnlinkatModule) findMaps() error {
+	var err error
+	if um.mapArgs, err = um.module.GetMap("args"); err != nil {
+		return err
+	}
+	if um.eventPb, err = um.module.InitPerfBuf("events", um.eventsChannel, um.lostChannel, 1); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (um *UnlinkatModule) initArgs() error {
+	var zero uint32
+	var err error
+	var tgidFilter uint32
+	if um.pid <= 0 {
+		tgidFilter = 0
+	} else {
+		tgidFilter = uint32(um.pid)
+	}
+	args := C.struct_unlinkat_args{
+		tgid_filter: C.uint(tgidFilter),
+	}
+	err = um.mapArgs.UpdateValueFlags(unsafe.Pointer(&zero), unsafe.Pointer(&args), 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (um *UnlinkatModule) processEvents() {
 	for {
 		select {
-		case data := <-bm.eventsChannel:
+		case data := <-um.eventsChannel:
 			var e UnlinkatEvent
 			dataBuffer := bytes.NewBuffer(data)
 			err := binary.Read(dataBuffer, binary.LittleEndian, &e)
@@ -77,24 +122,24 @@ func (bm *UnlinkatModule) processEvents() {
 				continue
 			}
 			log.Printf("pid %d unlinkat %v", e.Pid, e.filename())
-		case e := <-bm.lostChannel:
+		case e := <-um.lostChannel:
 			log.Printf("lost %d events", e)
-		case <-bm.stopCh:
-			bm.module.Close()
+		case <-um.stopCh:
+			um.module.Close()
 			return
 		}
 	}
 }
 
-func (bm *UnlinkatModule) Stop() {
-	if bm.module == nil {
+func (um *UnlinkatModule) Stop() {
+	if um.module == nil {
 		return
 	}
-	close(bm.stopCh)
+	close(um.stopCh)
 }
 
-func (bm *UnlinkatModule) resizeMap(name string, size uint32) error {
-	m, err := bm.module.GetMap(name)
+func (um *UnlinkatModule) resizeMap(name string, size uint32) error {
+	m, err := um.module.GetMap(name)
 	if err != nil {
 		return err
 	}
