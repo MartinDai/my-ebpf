@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/binary"
 	"fmt"
+	"github.com/MartinDai/my-ebpf/pkg/util"
 	bpf "github.com/aquasecurity/libbpfgo"
 	"log"
 	"unsafe"
@@ -43,8 +44,13 @@ func NewUnlinkatModule(pid int) *UnlinkatModule {
 
 func (um *UnlinkatModule) Start() error {
 	var err error
-	args := bpf.NewModuleArgs{BPFObjBuff: unlinkatBpf, BPFObjName: "unlinkat"}
-	if um.module, err = bpf.NewModuleFromBufferArgs(args); err != nil {
+
+	bpfObjPath := ".bpf/unlinkat.bpf.o"
+	if err = util.SaveFile(bpfObjPath, unlinkatBpf); err != nil {
+		return err
+	}
+
+	if um.module, err = bpf.NewModuleFromFile(bpfObjPath); err != nil {
 		return err
 	}
 
