@@ -14,15 +14,15 @@ import (
 
 //#cgo CFLAGS: -I./bpf/
 //#include <linux/types.h>
-//#include "unlinkat.bpf.h"
+//#include "my.bpf.h"
 import "C"
 
-type UnlinkatEvent struct {
+type Event struct {
 	Pid      uint32
 	Filename [256]byte
 }
 
-type UnlinkatModule struct {
+type Module struct {
 	pid           int
 	module        *bpf.Module
 	prog          *bpf.BPFProg
@@ -33,8 +33,8 @@ type UnlinkatModule struct {
 	stopCh        chan struct{}
 }
 
-func NewUnlinkatModule(pid int) *UnlinkatModule {
-	return &UnlinkatModule{
+func NewModule(pid int) *Module {
+	return &Module{
 		pid:           pid,
 		eventsChannel: make(chan []byte),
 		lostChannel:   make(chan uint64),
@@ -42,11 +42,11 @@ func NewUnlinkatModule(pid int) *UnlinkatModule {
 	}
 }
 
-func (um *UnlinkatModule) Start() error {
+func (um *Module) Start() error {
 	var err error
 
-	bpfObjPath := ".bpf/unlinkat.bpf.o"
-	if err = util.SaveFile(bpfObjPath, unlinkatBpf); err != nil {
+	bpfObjPath := ".bpf/my.bpf.o"
+	if err = util.SaveFile(bpfObjPath, myBpf); err != nil {
 		return err
 	}
 
@@ -84,7 +84,7 @@ func (um *UnlinkatModule) Start() error {
 	return nil
 }
 
-func (um *UnlinkatModule) findMaps() error {
+func (um *Module) findMaps() error {
 	var err error
 	if um.mapArgs, err = um.module.GetMap("args"); err != nil {
 		return err
@@ -95,7 +95,7 @@ func (um *UnlinkatModule) findMaps() error {
 	return nil
 }
 
-func (um *UnlinkatModule) initArgs() error {
+func (um *Module) initArgs() error {
 	var zero uint32
 	var err error
 	var tgidFilter uint32
@@ -104,7 +104,7 @@ func (um *UnlinkatModule) initArgs() error {
 	} else {
 		tgidFilter = uint32(um.pid)
 	}
-	args := C.struct_unlinkat_args{
+	args := C.struct_my_args{
 		tgid_filter: C.uint(tgidFilter),
 	}
 	if err = um.mapArgs.UpdateValueFlags(unsafe.Pointer(&zero), unsafe.Pointer(&args), 0); err != nil {
@@ -113,17 +113,17 @@ func (um *UnlinkatModule) initArgs() error {
 	return nil
 }
 
-func (um *UnlinkatModule) processEvents() {
+func (um *Module) processEvents() {
 	for {
 		select {
 		case data := <-um.eventsChannel:
-			var e UnlinkatEvent
+			var e Event
 			dataBuffer := bytes.NewBuffer(data)
 			if err := binary.Read(dataBuffer, binary.LittleEndian, &e); err != nil {
 				log.Printf("process event error, Cause%v\n", err)
 				continue
 			}
-			log.Printf("pid %d unlinkat %v", e.Pid, e.filename())
+			log.Printf("pid:%d filename:%v", e.Pid, e.filename())
 		case e := <-um.lostChannel:
 			log.Printf("lost %d events", e)
 		case <-um.stopCh:
@@ -133,14 +133,14 @@ func (um *UnlinkatModule) processEvents() {
 	}
 }
 
-func (um *UnlinkatModule) Stop() {
+func (um *Module) Stop() {
 	if um.module == nil {
 		return
 	}
 	close(um.stopCh)
 }
 
-func (um *UnlinkatModule) resizeMap(name string, size uint32) error {
+func (um *Module) resizeMap(name string, size uint32) error {
 	var m *bpf.BPFMap
 	var err error
 	if m, err = um.module.GetMap(name); err != nil {
@@ -155,9 +155,9 @@ func (um *UnlinkatModule) resizeMap(name string, size uint32) error {
 	return nil
 }
 
-func (ue UnlinkatEvent) filename() string {
+func (ue Event) filename() string {
 	return string(bytes.TrimRight(ue.Filename[:], "\x00"))
 }
 
-//go:embed bpf/unlinkat.bpf.o
-var unlinkatBpf []byte
+//go:embed bpf/my.bpf.o
+var myBpf []byte

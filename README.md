@@ -9,6 +9,7 @@ sh build.sh
 ```
 
 ## 指定架构构建
+
 ```shell
 sh build.sh amd64
 ```

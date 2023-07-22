@@ -3,6 +3,6 @@ struct event {
     char filename[256];
 };
 
-struct unlinkat_args {
+struct my_args {
     __u32 tgid_filter;// 0 => everything
 };

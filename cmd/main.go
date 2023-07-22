@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	log.Println("[INFO] Start unlinkat module")
+	log.Println("[INFO] Start module")
 	var configFile string
 	flag.StringVar(&configFile, "config", "", "配置文件")
 	flag.Parse()
@@ -23,18 +23,18 @@ func main() {
 		log.Fatal(fmt.Errorf("[ERROR] Process config error\nCause: %w", err))
 	}
 
-	unlinkatModule := pkg.NewUnlinkatModule(config.Pid)
-	if err = unlinkatModule.Start(); err != nil {
-		log.Fatalf("[INFO] Start unlinkat module error, Cause:%v", err)
+	module := pkg.NewModule(config.Pid)
+	if err = module.Start(); err != nil {
+		log.Fatalf("[INFO] Start module error, Cause:%v", err)
 	}
 
-	log.Println("[INFO] Start unlinkat module successful")
+	log.Println("[INFO] Start module successful")
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 
-	unlinkatModule.Stop()
+	module.Stop()
 
-	log.Println("[INFO] Stop unlinkat module successful")
+	log.Println("[INFO] Stop module successful")
 }

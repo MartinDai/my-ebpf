@@ -1,12 +1,12 @@
 #include "vmlinux.h"
-#include "unlinkat.bpf.h"
+#include "my.bpf.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
     __type(key, u32);
-    __type(value, struct unlinkat_args);
+    __type(value, struct my_args);
     __uint(max_entries, 1);
 } args SEC(".maps");
 
@@ -21,8 +21,8 @@ int kprobe__do_unlinkat(struct pt_regs *ctx) {
     u64 id = bpf_get_current_pid_tgid();
     u32 tgid = id >> 32;
     u32 pid = id;
-	u32 zero = 0;
-    struct unlinkat_args *arg = bpf_map_lookup_elem(&args, &zero);
+    u32 zero = 0;
+    struct my_args *arg = bpf_map_lookup_elem(&args, &zero);
 
     if (!arg) {
         return 0;
