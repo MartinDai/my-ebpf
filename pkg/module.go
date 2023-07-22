@@ -27,9 +27,8 @@ type Module struct {
 	module        *bpf.Module
 	prog          *bpf.BPFProg
 	mapArgs       *bpf.BPFMap
-	eventPb       *bpf.PerfBuffer
+	eventBuffer   *bpf.RingBuffer
 	eventsChannel chan []byte
-	lostChannel   chan uint64
 	stopCh        chan struct{}
 }
 
@@ -37,12 +36,11 @@ func NewModule(pid int) *Module {
 	return &Module{
 		pid:           pid,
 		eventsChannel: make(chan []byte),
-		lostChannel:   make(chan uint64),
 		stopCh:        make(chan struct{}),
 	}
 }
 
-func (um *Module) Start() error {
+func (m *Module) Start() error {
 	var err error
 
 	bpfObjPath := ".bpf/my.bpf.o"
@@ -50,106 +48,104 @@ func (um *Module) Start() error {
 		return err
 	}
 
-	if um.module, err = bpf.NewModuleFromFile(bpfObjPath); err != nil {
+	if m.module, err = bpf.NewModuleFromFile(bpfObjPath); err != nil {
 		return err
 	}
 
-	if err = um.resizeMap("events", 8192); err != nil {
+	if err = m.resizeMap("events", 8192); err != nil {
 		return err
 	}
 
-	if err := um.module.BPFLoadObject(); err != nil {
+	if err := m.module.BPFLoadObject(); err != nil {
 		return err
 	}
-	if um.prog, err = um.module.GetProgram("kprobe__do_unlinkat"); err != nil {
-		return err
-	}
-
-	if err = um.findMaps(); err != nil {
+	if m.prog, err = m.module.GetProgram("kprobe__do_sys_openat2"); err != nil {
 		return err
 	}
 
-	if err = um.initArgs(); err != nil {
+	if err = m.findMaps(); err != nil {
 		return err
 	}
 
-	if _, err := um.prog.AttachKprobe("do_unlinkat"); err != nil {
+	if err = m.initArgs(); err != nil {
 		return err
 	}
 
-	um.eventPb.Start()
+	if _, err := m.prog.AttachKprobe("do_sys_openat2"); err != nil {
+		return err
+	}
 
-	go um.processEvents()
+	m.eventBuffer.Start()
+
+	go m.processEvents()
 
 	return nil
 }
 
-func (um *Module) findMaps() error {
+func (m *Module) findMaps() error {
 	var err error
-	if um.mapArgs, err = um.module.GetMap("args"); err != nil {
+	if m.mapArgs, err = m.module.GetMap("args"); err != nil {
 		return err
 	}
-	if um.eventPb, err = um.module.InitPerfBuf("events", um.eventsChannel, um.lostChannel, 1); err != nil {
+	if m.eventBuffer, err = m.module.InitRingBuf("events", m.eventsChannel); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (um *Module) initArgs() error {
+func (m *Module) initArgs() error {
 	var zero uint32
 	var err error
 	var tgidFilter uint32
-	if um.pid <= 0 {
+	if m.pid <= 0 {
 		tgidFilter = 0
 	} else {
-		tgidFilter = uint32(um.pid)
+		tgidFilter = uint32(m.pid)
 	}
-	args := C.struct_my_args{
+	args := C.struct_my_args_t{
 		tgid_filter: C.uint(tgidFilter),
 	}
-	if err = um.mapArgs.UpdateValueFlags(unsafe.Pointer(&zero), unsafe.Pointer(&args), 0); err != nil {
+	if err = m.mapArgs.UpdateValueFlags(unsafe.Pointer(&zero), unsafe.Pointer(&args), 0); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (um *Module) processEvents() {
+func (m *Module) processEvents() {
 	for {
 		select {
-		case data := <-um.eventsChannel:
+		case data := <-m.eventsChannel:
 			var e Event
 			dataBuffer := bytes.NewBuffer(data)
 			if err := binary.Read(dataBuffer, binary.LittleEndian, &e); err != nil {
 				log.Printf("process event error, Cause%v\n", err)
 				continue
 			}
-			log.Printf("pid:%d filename:%v", e.Pid, e.filename())
-		case e := <-um.lostChannel:
-			log.Printf("lost %d events", e)
-		case <-um.stopCh:
-			um.module.Close()
+			log.Printf("pid:%d openat:%v", e.Pid, e.filename())
+		case <-m.stopCh:
+			m.module.Close()
 			return
 		}
 	}
 }
 
-func (um *Module) Stop() {
-	if um.module == nil {
+func (m *Module) Stop() {
+	if m.module == nil {
 		return
 	}
-	close(um.stopCh)
+	close(m.stopCh)
 }
 
-func (um *Module) resizeMap(name string, size uint32) error {
-	var m *bpf.BPFMap
+func (m *Module) resizeMap(name string, size uint32) error {
+	var bm *bpf.BPFMap
 	var err error
-	if m, err = um.module.GetMap(name); err != nil {
+	if bm, err = m.module.GetMap(name); err != nil {
 		return err
 	}
-	if err = m.Resize(size); err != nil {
+	if err = bm.Resize(size); err != nil {
 		return err
 	}
-	if actual := m.GetMaxEntries(); actual != size {
+	if actual := bm.GetMaxEntries(); actual != size {
 		return fmt.Errorf("map resize failed, expected %v, actual %v", size, actual)
 	}
 	return nil
