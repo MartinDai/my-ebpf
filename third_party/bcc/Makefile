@@ -13,7 +13,3 @@ build-bcc:
 			-DCMAKE_BUILD_TYPE=Release \
 			-DCMAKE_INSTALL_PREFIX=$(shell pwd)/lib \
         		&& make -j16 install
-
-.PHONY: clean
-clean:
-	rm -rf src lib
